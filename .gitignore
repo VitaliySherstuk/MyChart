@@ -1,0 +1,14 @@
+*.bak
+*.ncb
+*.log 
+
+target/
+test-output/
+.classpath
+.project
+.settings
+/.idea
+src/test/resources/reportportal.properties
+
+*.DS_Store
+[Tt]humbs.db
