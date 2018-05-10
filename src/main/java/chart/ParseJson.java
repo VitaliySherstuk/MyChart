@@ -1,5 +1,6 @@
 package chart;
 
+
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -13,6 +14,9 @@ public class ParseJson {
     {
         List<DataChart> list = new ArrayList<>();
         String correctJson = stringToJson.replace("'", "\"").replace("@", " ").replace("_", " ").replace("Agreed upon Timeline", "Agreed-upon Timeline");
+
+       // System.out.println("INPUT JSON: " + stringToJson);
+       // System.out.println("Correct JSON: " + correctJson);
         JSONParser parser = new JSONParser();
         try {
 
@@ -22,9 +26,12 @@ public class ParseJson {
             {
                 Map<String, String> mapData = new HashMap<>();
                 JSONObject objectJson = (JSONObject)json.get(i);
+
                 for(int y=0; y<parameters.length; y++) {
 
+                    //System.out.print(parameters[y]);
                     double value = Double.valueOf(objectJson.get(parameters[y]).toString());
+                    //System.out.println(" --> " + value);
                     if(Math.abs(value)>=10)
                     {
                         double correctValue = Math.round(value);
@@ -43,6 +50,7 @@ public class ParseJson {
         } catch (ParseException e) {
             e.printStackTrace();
         }
+
         return list;
     }
 
@@ -93,4 +101,5 @@ public class ParseJson {
 
         return listDiagramParameters;
     }
+
 }

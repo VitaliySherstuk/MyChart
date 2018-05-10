@@ -14,8 +14,6 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.xmlbeans.XmlException;
 import org.openxmlformats.schemas.drawingml.x2006.chart.*;
 import org.openxmlformats.schemas.drawingml.x2006.main.*;
-
-import javax.swing.text.html.HTMLDocument;
 import java.awt.geom.Rectangle2D;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -26,7 +24,7 @@ public class CreateRadar {
     private XSLFShape chartShape;
     private Rectangle2D templeteAnchor;
 
-    //old diagrams parameters
+    //diagram parameters from templite
     private List<CTValAx> ctValAxes;
     private List<CTCatAx> ctCatAxes;
     private CTTextBody legendPropertiesText;
@@ -36,6 +34,7 @@ public class CreateRadar {
     private CTRadarSer ctRadarSerTempliteRefTwo;
     private CTRadarSer ctRadarSerTempliteOne;
     private CTRadarSer ctRadarSerTempliteTwo;
+    private  CTLayout ctLayout;
 
     public CreateRadar(XSLFSlide templiteSlide, XSLFShape chartShape){
         this.templiteSlide = templiteSlide;
@@ -43,7 +42,9 @@ public class CreateRadar {
         parseChartTemplite();
     }
 
+    // If you take input data from excel file for diagrams(not use json), you have to use this method
     public List<DataChart> getDataRadar(Workbook workbook) {
+
         List<DataChart> dataRadar = new ArrayList<>();
 
         Sheet sheet = workbook.getSheetAt(0);
@@ -107,9 +108,10 @@ public class CreateRadar {
 
         return dataRadar;
     }
+
     private void parseChartTemplite() {
         List<XSLFChart> charts = new ArrayList<>();
-         XSLFSheet sheet = chartShape.getSheet();
+        XSLFSheet sheet = chartShape.getSheet();
         XSLFChart chartGraf=null;
         for (POIXMLDocumentPart docPart : chartShape.getSheet().getRelations()) {
 
@@ -124,18 +126,19 @@ public class CreateRadar {
         ctValAxes = charts.get(0).getCTChart().getPlotArea().getValAxList();
         ctCatAxes = charts.get(0).getCTChart().getPlotArea().getCatAxList();
         templeteAnchor = chartShape.getAnchor();
+        ctLayout = charts.get(0).getCTChart().getPlotArea().getLayout();
         legendPropertiesText = charts.get(0).getCTChart().getLegend().getTxPr();
         legendPropertiesShape = charts.get(0).getCTChart().getLegend().getSpPr();
         ctShapePropertiesPloatArea = charts.get(0).getCTChart().getPlotArea().getSpPr();
-        ctRadarSerTempliteRefOne = charts.get(0).getCTChart().getPlotArea().getRadarChartArray(0).getSerArray(0);
-        ctRadarSerTempliteRefTwo = charts.get(0).getCTChart().getPlotArea().getRadarChartArray(0).getSerArray(1);
-        ctRadarSerTempliteOne = charts.get(0).getCTChart().getPlotArea().getRadarChartArray(0).getSerArray(2);
-        ctRadarSerTempliteTwo = charts.get(0).getCTChart().getPlotArea().getRadarChartArray(0).getSerArray(3);
+        ctRadarSerTempliteOne = charts.get(0).getCTChart().getPlotArea().getRadarChartArray(0).getSerArray(0);
+        ctRadarSerTempliteTwo = charts.get(0).getCTChart().getPlotArea().getRadarChartArray(0).getSerArray(1);
+
+        //save template of background ser
+        //ctRadarSerTempliteRefOne = charts.get(0).getCTChart().getPlotArea().getRadarChartArray(0).getSerArray(0);
+        //ctRadarSerTempliteRefTwo = charts.get(0).getCTChart().getPlotArea().getRadarChartArray(0).getSerArray(1);
 
         //delete the old diagrams
         templiteSlide.getXmlObject().getCSld().getSpTree().getGraphicFrameList().clear();
-
-
 
     }
 
@@ -164,8 +167,6 @@ public class CreateRadar {
         myXSLFChartShape.getMyXSLFChart().getWorkbook().getXSSFWorkbook();
         XSSFWorkbook workbook = myXSLFChartShape.getMyXSLFChart().getWorkbook().getXSSFWorkbook();
         XSSFSheet sheet = workbook.getSheetAt(0);
-
-
         sheet.createRow(0);
         sheet.getRow(0).createCell(0).setCellValue("CSAT round");
        for(int i=0; i<mas.length; i++)
@@ -177,6 +178,7 @@ public class CreateRadar {
         {
             sheet.createRow(i+1);
             sheet.getRow(i+1).createCell(0).setCellValue(dataRadar.get(i).getPeriod());
+
             for (int c = 1; c < mas.length+1; c++) {
 
                 sheet.getRow(i+1).createCell(c).setCellValue(Double.valueOf(dataRadar.get(i).getData().get((mas[c-1]).toLowerCase())));
@@ -193,13 +195,14 @@ public class CreateRadar {
         ctChart.addNewAutoTitleDeleted();
 
         CTPlotArea ctPlotArea = ctChart.addNewPlotArea();
-        ctPlotArea.addNewLayout();
+        ctPlotArea.setLayout(ctLayout);
         ctPlotArea.setSpPr(ctShapePropertiesPloatArea);
 
         CTRadarChart ctRadarChart = ctPlotArea.addNewRadarChart();
         ctRadarChart.addNewVaryColors().setVal(false);
         ctRadarChart.addNewRadarStyle().setVal(STRadarStyle.MARKER);
 
+        //generate massive English letters to use for creating excel formulas(e.g. =Sheet!$A2:$J2)
         Character[] letters = new Character[26];
         int n=0;
         for(char q ='A'; q<='Z'; q++)
@@ -208,10 +211,13 @@ public class CreateRadar {
             n++;
         }
 
+        //copy RadarSer from diagram template in order to use its styles
         CTRadarSer[] arrayRadarSer = null;
+
         if(dataRadar.size()>2)
         {
-            arrayRadarSer = new CTRadarSer[dataRadar.size() + 2];
+            //code that we use for background(create for case when we have axis from 2 until 5)
+            /*arrayRadarSer = new CTRadarSer[dataRadar.size() + 2];
             arrayRadarSer[0] = ctRadarSerTempliteRefOne;
             arrayRadarSer[1] = ctRadarSerTempliteRefTwo;
             arrayRadarSer[2] = ctRadarSerTempliteOne;
@@ -219,6 +225,14 @@ public class CreateRadar {
             for(int i=0; i<dataRadar.size()-2; i++)
             {
                arrayRadarSer[3+(i+1)] = ctRadarSerTempliteTwo;
+            }*/
+
+            arrayRadarSer = new CTRadarSer[dataRadar.size()];
+            arrayRadarSer[0] = ctRadarSerTempliteOne;
+            arrayRadarSer[1] = ctRadarSerTempliteTwo;
+            for(int i=0; i<dataRadar.size()-2; i++)
+            {
+                arrayRadarSer[1+(i+1)] = ctRadarSerTempliteTwo;
             }
 
         }
@@ -231,16 +245,16 @@ public class CreateRadar {
         }
         else
         {
-            arrayRadarSer = new CTRadarSer[4];
-            arrayRadarSer[0] = ctRadarSerTempliteRefOne;
-            arrayRadarSer[1] = ctRadarSerTempliteRefTwo;
-            arrayRadarSer[2] = ctRadarSerTempliteOne;
-            arrayRadarSer[3] = ctRadarSerTempliteTwo;
+            arrayRadarSer = new CTRadarSer[2];
+            //arrayRadarSer[0] = ctRadarSerTempliteRefOne;
+            //arrayRadarSer[1] = ctRadarSerTempliteRefTwo;
+            arrayRadarSer[0] = ctRadarSerTempliteOne;
+            arrayRadarSer[1] = ctRadarSerTempliteTwo;
         }
 
 
-        //create RadarSer !REF
-        ctRadarChart.setSerArray(arrayRadarSer);
+        //create RadarSer !REF(background)
+        /*ctRadarChart.setSerArray(arrayRadarSer);
         for(int i=0; i<2; i++)
         {
             CTRadarSer ctRadarSerOne = ctRadarChart.getSerArray()[i];
@@ -256,29 +270,38 @@ public class CreateRadar {
                 ctStrVal[y].setIdx(y);
                 ctStrVal[y].setV(mas[y]);
             }
-        }
+        }*/
+
 
         //create RadarSer with value
+        ctRadarChart.setSerArray(arrayRadarSer);
         for(int i=0; i<dataRadar.size(); i++)
-        {
-            CTRadarSer ctRadarSerTwo = ctRadarChart.getSerArray()[2+i];
-            ctRadarSerTwo.getIdx().setVal(2+i);
-            ctRadarSerTwo.getOrder().setVal(2+i);
+        {       //if you deal with radar and background
+            //CTRadarSer ctRadarSerTwo = ctRadarChart.getSerArray()[2+i];
+            //ctRadarSerTwo.getIdx().setVal(2+i);
+            //ctRadarSerTwo.getOrder().setVal(2+i);
+            //ctRadarSerTwo.getTx().getStrRef().setF("Sheet1!$A$" + String.valueOf(i+2));
+            //ctRadarSerTwo.getTx().getStrRef().getStrCache().getPtCount().setVal(1);
+            //ctRadarSerTwo.getTx().getStrRef().getStrCache().getPtList().get(0).setV(dataRadar.get(i).getPeriod());
+
+            CTRadarSer ctRadarSerTwo = ctRadarChart.getSerArray()[i];
+            ctRadarSerTwo.getIdx().setVal(i);
+            ctRadarSerTwo.getOrder().setVal(i);
             ctRadarSerTwo.getTx().getStrRef().setF("Sheet1!$A$" + String.valueOf(i+2));
             ctRadarSerTwo.getTx().getStrRef().getStrCache().getPtCount().setVal(1);
+
             ctRadarSerTwo.getTx().getStrRef().getStrCache().getPtList().get(0).setV(dataRadar.get(i).getPeriod());
 
             switch(i)
             {
                 case 0:
-                    ctRadarSerTwo.getSpPr().getLn().getSolidFill().getSchemeClr().setVal(STSchemeColorVal.ACCENT_2);
+                    ctRadarSerTwo.getSpPr().getLn().getSolidFill().getSchemeClr().setVal(STSchemeColorVal.ACCENT_1);
                     break;
                 case 1:
-                    ctRadarSerTwo.getSpPr().getLn().getSolidFill().getSchemeClr().setVal(STSchemeColorVal.ACCENT_3);
+                    ctRadarSerTwo.getSpPr().getLn().getSolidFill().getSchemeClr().setVal(STSchemeColorVal.ACCENT_2);
                     break;
                 case 2:
-                    ctRadarSerTwo.getSpPr().getLn().getSolidFill().getSchemeClr().setVal(STSchemeColorVal.ACCENT_6);
-                    ctRadarSerTwo.getSpPr().getLn().getSolidFill().getSchemeClr().addNewLumOff().setVal(15000);
+                    ctRadarSerTwo.getSpPr().getLn().getSolidFill().getSchemeClr().setVal(STSchemeColorVal.ACCENT_3);
                     break;
                 case 3:
                     ctRadarSerTwo.getSpPr().getLn().getSolidFill().getSchemeClr().setVal(STSchemeColorVal.ACCENT_6);
@@ -286,9 +309,10 @@ public class CreateRadar {
             }
 
             ctRadarSerTwo.getCat().getStrRef().setF("Sheet1!$B$1:$" + letters[dataRadar.get(0).getData().size()] + "$1");
+
+            //To delete <cat> and <val> data from RadarSer. To create new StrRef and NumRef and fill new data from input json or excel
             CTStrRef ctStrRef_cat_Two = ctRadarSerTwo.getCat().getStrRef();
             ctStrRef_cat_Two.unsetStrCache();
-
             CTStrData ctStrData1_cat_Two = ctStrRef_cat_Two.addNewStrCache();
             ctStrData1_cat_Two.addNewPtCount().setVal(dataRadar.get(0).getData().size());
 
@@ -304,7 +328,6 @@ public class CreateRadar {
                 CTStrVal ctStrValTwo = ctStrData1_cat_Two.addNewPt();
                 ctStrValTwo.setIdx(y);
                 ctStrValTwo.setV(mas[y]);
-
                 CTNumVal ctNumValTwo= ctNumData_val_Two.addNewPt();
                 ctNumValTwo.setIdx(y);
                 ctNumValTwo.setV(dataRadar.get(i).getData().get((mas[y]).toLowerCase()));
@@ -334,11 +357,11 @@ public class CreateRadar {
 
         CTLegendEntry ctLegendEntryOne = cTLegend.addNewLegendEntry();
         ctLegendEntryOne.addNewIdx().setVal(0);
-        ctLegendEntryOne.addNewDelete().setVal(true);
+        ctLegendEntryOne.addNewDelete().setVal(false);
 
         CTLegendEntry ctLegendEntryTwo = cTLegend.addNewLegendEntry();
         ctLegendEntryTwo.addNewIdx().setVal(1);
-        ctLegendEntryTwo.addNewDelete().setVal(true);
+        ctLegendEntryTwo.addNewDelete().setVal(false);
 
         cTLegend.addNewOverlay().setVal(false);
         cTLegend.setTxPr(legendPropertiesText);

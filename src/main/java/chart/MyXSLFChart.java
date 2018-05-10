@@ -29,6 +29,7 @@ public class MyXSLFChart extends POIXMLDocumentPart {
 
     }
 
+
     public CTChartSpace getChartSpace() {
         return chartSpace;
     }

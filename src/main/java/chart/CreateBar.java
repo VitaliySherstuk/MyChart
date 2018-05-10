@@ -10,7 +10,6 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.util.Units;
 import org.apache.poi.xslf.usermodel.XSLFChart;
 import org.apache.poi.xslf.usermodel.XSLFShape;
-import org.apache.poi.xslf.usermodel.XSLFSheet;
 import org.apache.poi.xslf.usermodel.XSLFSlide;
 import org.apache.poi.xssf.usermodel.*;
 import org.apache.xmlbeans.XmlException;
@@ -18,6 +17,7 @@ import org.openxmlformats.schemas.drawingml.x2006.chart.*;
 import org.openxmlformats.schemas.drawingml.x2006.main.*;
 import org.openxmlformats.schemas.presentationml.x2006.main.CTGraphicalObjectFrame;
 import java.awt.geom.Rectangle2D;
+import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -39,6 +39,7 @@ public class CreateBar {
     private List<CTLineChart> ctLineChartList;
     private CTDLbls ctdLbl;
     private CTDLbls ctdLblsT;
+
 
 
     public CreateBar(XSLFSlide templiteSlide, XSLFShape chartShape) throws InvalidFormatException {
@@ -122,23 +123,27 @@ public class CreateBar {
 
 
     private void parseChartTemplite() throws InvalidFormatException {
+
         List<XSLFChart> charts = new ArrayList<>();
-        XSLFSheet sheet = chartShape.getSheet();
         XSLFChart chartGraf=null;
         for (POIXMLDocumentPart docPart : chartShape.getSheet().getRelations()) {
 
             if (docPart instanceof XSLFChart) {
 
                 chartGraf = (XSLFChart) docPart;
+
                 if(chartGraf.getCTChart().getPlotArea().getBarChartList().size()!=0)
                 {
                     charts.add(chartGraf);
+
                 }
 
             }
         }
 
         CTPlotArea ctPlotAreaOld = charts.get(0).getCTChart().getPlotArea();
+        //System.out.println(ctPlotAreaOld);
+        //System.out.println(charts.get(0).getCTChart().getPlotArea().getValAxArray()[0].getScaling());
         templeteAnchor = chartShape.getAnchor();
         ctShapePropertiesPloatArea = ctPlotAreaOld.getSpPr();
         ctdLblsT = ctPlotAreaOld.getBarChartList().get(0).getSerArray()[0].getDLbls();
@@ -155,15 +160,16 @@ public class CreateBar {
         //data for Line
         ctLineChartList = ctPlotAreaOld.getLineChartList();
 
+
         //delete the old diagrams
         List<CTGraphicalObjectFrame> ctGraphicalObjectFrame =
                 templiteSlide.getXmlObject().getCSld().getSpTree().getGraphicFrameList();
-
         for(int i=0; i<ctGraphicalObjectFrame.size(); i++)
         {
             CTGraphicalObjectFrame frame = ctGraphicalObjectFrame.get(i);
-            if(frame.getNvGraphicFramePr().getCNvPr().getName().contains("Chart 8"))
+            if(frame.getNvGraphicFramePr().getCNvPr().getName().equals("Chart 10") || frame.getNvGraphicFramePr().getCNvPr().getName().equals("Chart 8"))
             {
+
                 ctPositiveSize2DExt = ctGraphicalObjectFrame.get(i).getXfrm().getExt();
                 ctPoint2D = ctGraphicalObjectFrame.get(i).getXfrm().getOff();
                 ctGraphicalObjectFrame.remove(i);
@@ -195,6 +201,8 @@ public class CreateBar {
         //create excel in the pptx file for edit data
         XSSFWorkbook workbook = myXSLFChartShape.getMyXSLFChart().getWorkbook().getXSSFWorkbook();
         XSSFSheet sheet = workbook.getSheetAt(0);
+
+        //set the order of parameters for fill excel table by massive of parameters
         String[] nameColumn = {"Detractors", "Passives", "Promoters", "NPS", "Response Rate"};
         sheet.createRow(0);
         for(int i=0; i<nameColumn.length; i++)
@@ -245,7 +253,7 @@ public class CreateBar {
         ctChart.addNewPlotVisOnly().setVal(true);
         ctChart.addNewDispBlanksAs().setVal(STDispBlanksAs.GAP);
         ctChart.addNewShowDLblsOverMax().setVal(false);
-        ctChart.addNewAutoTitleDeleted();
+        ctChart.addNewAutoTitleDeleted().setVal(true);
 
         CTPlotArea ctPlotArea = ctChart.addNewPlotArea();
         ctPlotArea.addNewLayout();
@@ -287,7 +295,8 @@ public class CreateBar {
                 ctBarSer.unsetDLbls();
                 ctBarSer.setDLbls(ctdLblsT);
 
-                ctBarSer.getDLbls().addNewDLblPos().setVal(STDLblPos.CTR);
+
+                //ctBarSer.getDLbls().addNewDLblPos().setVal(STDLblPos.CTR);
                 CTStrRef ctStrRef = ctBarSer.getCat().getStrRef();
                 String fStr = null;
                 if(amountPeriod==1)
@@ -302,13 +311,18 @@ public class CreateBar {
                 ctStrRef.unsetStrCache();
                 CTStrData ctStrData = ctStrRef.addNewStrCache();
                 ctStrData.addNewPtCount().setVal(listDataBar.size());
+
                 CTNumRef ctNumRef = ctBarSer.getVal().getNumRef();
 
                 ctNumRef.unsetNumCache();
                 CTNumData ctNumData = ctNumRef.addNewNumCache();
                 ctNumData.setFormatCode("0%");
                 ctNumData.addNewPtCount().setVal(listDataBar.size());
-                ctNumRef.setF("Sheet1!$" + letters[i+1] +"$2:$" + letters[i+1] +"$" + String.valueOf(amountPeriod+1));
+
+                // if we have rotate chart axis, we have to use 'letters[amountSer - i]'
+                // if we have not rotate chart axis, we have to use 'letters[i+1]'
+                ctNumRef.setF("Sheet1!$" + letters[amountSer - i] +"$2:$" + letters[amountSer - i] +"$" + String.valueOf(amountPeriod+1));
+
                 for(int y=0; y<amountPeriod; y++)
                 {
                     CTStrVal ctStrVal = ctStrData.addNewPt();
@@ -316,7 +330,6 @@ public class CreateBar {
                     ctStrVal.setV(listDataBar.get(y).getPeriod());
                     CTNumVal ctNumVal = ctNumData.addNewPt();
                     ctNumVal.setIdx(y);
-
 
                     ctNumVal.setV(listDataBar.get(y).getData()
                             .get((ctBarSer.getTx().getStrRef().getStrCache().getPtList().get(0).getV()).toLowerCase()));
@@ -337,64 +350,76 @@ public class CreateBar {
         ctLineChartList.toArray(ctLineChartsArray);
         ctPlotArea.setLineChartArray(ctLineChartsArray);
         CTLineChart[] ctLineCharts = ctPlotArea.getLineChartArray();
+
         for(int i=0; i<ctLineCharts.length; i++)
         {
             CTLineChart ctLineChart = ctPlotArea.getLineChartArray()[i];
-            CTSerTx ctSerTx = ctLineChart.getSerList().get(0).getTx();
 
+            for(int z=0; z<ctLineChart.getSerList().size(); z++)
+            {
+                CTSerTx ctSerTx = ctLineChart.getSerList().get(z).getTx();
 
-            CTStrRef ctStrRef = ctLineChart.getSerList().get(0).getCat().getStrRef();
-            String fStrLine = null;
-            if(amountPeriod==1)
-            {
-                fStrLine = "Sheet1!$A$2";
-            }
-            else
-            {
-                fStrLine = "Sheet1!$A$2:$A$" + String.valueOf(amountPeriod+1);
-            }
-            ctStrRef.setF(fStrLine);
-            ctStrRef.unsetStrCache();
-            CTStrData ctStrData = ctStrRef.addNewStrCache();
-            ctStrData.addNewPtCount().setVal(listDataLine.size());
+                CTStrRef ctStrRef = ctLineChart.getSerList().get(z).getCat().getStrRef();
+                String fStrLine = null;
+                if(amountPeriod==1)
+                {
+                    fStrLine = "Sheet1!$A$2";
+                }
+                else
+                {
+                    fStrLine = "Sheet1!$A$2:$A$" + String.valueOf(amountPeriod+1);
+                }
+                ctStrRef.setF(fStrLine);
+                ctStrRef.unsetStrCache();
+                CTStrData ctStrData = ctStrRef.addNewStrCache();
+                ctStrData.addNewPtCount().setVal(listDataLine.size());
 
-            CTNumRef ctNumRef = ctLineChart.getSerList().get(0).getVal().getNumRef();
-            if(ctSerTx.getStrRef().getStrCache().getPtList().get(0).getV().equals("NPS"))
-            {
-                ctNumRef.setF("Sheet1!$E$2:$E$" + String.valueOf(amountPeriod+1));
-            }
-            else if(ctSerTx.getStrRef().getStrCache().getPtList().get(0).getV().equals("Response Rate"))
-            {
-                ctNumRef.setF("Sheet1!$F$2:$F$" + String.valueOf(amountPeriod+1));
-            }
-            else
-            {
-                ctNumRef.setF("Sheet1!$" + letters[i+4] +"$2:$" + letters[i+4] +"$" + String.valueOf(amountPeriod+1));
-            }
-            ctNumRef.unsetNumCache();
-            CTNumData ctNumData = ctNumRef.addNewNumCache();
-            if(ctSerTx.getStrRef().getStrCache().getPtList().get(0).getV().equals("Response Rate"))
-            {
-                ctNumData.setFormatCode("0%");
-            }
-            ctNumData.addNewPtCount().setVal(listDataLine.size());
+                CTNumRef ctNumRef = ctLineChart.getSerList().get(z).getVal().getNumRef();
+                if(ctSerTx.getStrRef().getStrCache().getPtList().get(0).getV().equals("NPS"))
+                {
+                    ctNumRef.setF("Sheet1!$E$2:$E$" + String.valueOf(amountPeriod+1));
+                }
+                else if(ctSerTx.getStrRef().getStrCache().getPtList().get(0).getV().equals("Response Rate"))
+                {
+                    ctNumRef.setF("Sheet1!$F$2:$F$" + String.valueOf(amountPeriod+1));
+                }
+                else
+                {
+                    ctNumRef.setF("Sheet1!$" + letters[i+4] +"$2:$" + letters[i+4] +"$" + String.valueOf(amountPeriod+1));
+                }
+                ctNumRef.unsetNumCache();
+                CTNumData ctNumData = ctNumRef.addNewNumCache();
+                if(ctSerTx.getStrRef().getStrCache().getPtList().get(0).getV().equals("Response Rate"))
+                {
+                    ctNumData.setFormatCode("0%");
+                }
+                ctNumData.addNewPtCount().setVal(listDataLine.size());
 
-            for(int y=0; y<listDataLine.size(); y++)
-            {
-                CTStrVal ctStrVal = ctStrData.addNewPt();
-                ctStrVal.setIdx(y);
-                ctStrVal.setV(listDataLine.get(y).getPeriod());
+                for(int y=0; y<listDataLine.size(); y++)
+                {
+                    CTStrVal ctStrVal = ctStrData.addNewPt();
+                    ctStrVal.setIdx(y);
+                    ctStrVal.setV(listDataLine.get(y).getPeriod());
 
-                CTNumVal ctNumVal = ctNumData.addNewPt();
-                ctNumVal.setIdx(y);
-                ctNumVal.setV(listDataLine.get(y).getData().get((ctSerTx.getStrRef().getStrCache().getPtList().get(0).getV()).toLowerCase()));
+                    CTNumVal ctNumVal = ctNumData.addNewPt();
+                    ctNumVal.setIdx(y);
+                    ctNumVal.setV(listDataLine.get(y).getData().get((ctSerTx.getStrRef().getStrCache().getPtList().get(0).getV()).toLowerCase()));
+                }
             }
 
         }
 
         //Legend
         ctChart.setLegend(ctLegendOld);
+       /* System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+        System.out.println(ctChart);*/
 
+        try {
+            //myXSLFChartShape.getMyXSLFChart().getWorkbook().commit();
+            myXSLFChartShape.getMyXSLFChart().commit();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public Rectangle2D getCoordinate(){

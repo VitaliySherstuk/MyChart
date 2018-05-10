@@ -50,7 +50,8 @@ public class MyXSLFChartShape {
 
         CTNonVisualDrawingProps cTNonVisualDrawingProps = cTGraphicalObjectFrameNonVisual.addNewCNvPr();
         cTNonVisualDrawingProps.setId(cNvPrId);
-        cTNonVisualDrawingProps.setName("MyChart" + cNvPrNameCount);
+        cTNonVisualDrawingProps.setName(cNvPrName+ " " + cNvPrNameCount);
+
 
         CTGraphicalObject graphicalObject = graphicalObjectFrame.addNewGraphic();
         CTGraphicalObjectData graphicalObjectData = CTGraphicalObjectData.Factory.parse(
